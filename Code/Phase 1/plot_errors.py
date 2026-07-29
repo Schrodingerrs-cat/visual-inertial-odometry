@@ -279,7 +279,7 @@ def main():
     ax.plot(est_P_aligned[:, 0], est_P_aligned[:, 2],
             color='tab:blue', linewidth=1.3, label='Estimate')
     ax.plot(gt_P_m[:, 0], gt_P_m[:, 2],
-            color=(0.86, 0.24, 0.66), linewidth=1.3, label='Groundtruth')
+            color='red', linewidth=1.3, label='Groundtruth')
     ax.set_xlabel('x [m]'); ax.set_ylabel('z [m]')
     ax.grid(True, alpha=0.3); ax.legend(loc='best', fontsize=9)
     ax.set_aspect('equal', adjustable='datalim')
@@ -294,7 +294,7 @@ def main():
     ax.plot(est_P_aligned[:, 0], est_P_aligned[:, 1],
             color='tab:blue', linewidth=1.3, label='Estimate')
     ax.plot(gt_P_m[:, 0], gt_P_m[:, 1],
-            color=(0.86, 0.24, 0.66), linewidth=1.3, label='Groundtruth')
+            color='red', linewidth=1.3, label='Groundtruth')
     ax.set_xlabel('x [m]'); ax.set_ylabel('y [m]')
     ax.grid(True, alpha=0.3); ax.legend(loc='best', fontsize=9)
     ax.set_aspect('equal', adjustable='datalim')

@@ -1,0 +1,22 @@
+# Phase 2 pinned dependencies. CUDA 12.8 wheels for Torch — required for
+# Blackwell (sm_120) GPUs like the RTX PRO 6000 on Turing. cu118 wheels silently
+# compile but fail at kernel launch with "no kernel image is available".
+--extra-index-url https://download.pytorch.org/whl/cu128
+
+torch
+torchvision
+numpy==1.26.4
+scipy==1.11.4
+opencv-python-headless==4.8.1.78
+pillow==10.2.0
+imageio==2.33.1
+matplotlib==3.8.2
+tqdm==4.66.1
+kornia==0.7.1
+evo==1.28.0
+pyyaml==6.0.1
+tensorboard==2.15.1
+einops==0.7.0
+transformers==4.36.2
+huggingface-hub==0.20.2
+pytest==7.4.4

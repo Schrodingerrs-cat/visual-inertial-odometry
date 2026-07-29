@@ -2,3 +2,41 @@ msckf_vio-master/
 Data/
 CLAUDE.md
 Code_baseline/
+__pycache__/
+*.pyc
+Code/Phase 2
+Group8_p4.zip
+
+# Claude Code local settings/cache
+.claude/
+
+# scratch / working directories, not repo deliverables
+temp/
+clear/
+architecture/
+architecture.zip
+full_results/
+full_results.zip
+Code/Phase2_main.zip
+
+# personal presentation / exam-prep notes, not repo docs
+/Phase2_VIO_*.md
+/Phase2_paper.md
+/speech.md
+/report.md
+/Report_ph1.pdf
+/Phase2_VIO_Deck.pdf
+
+# oversized video, exceeds GitHub's 100MB file limit
+Results/Phase1/Phase1_video.webm
+
+# Phase 2 raw training artifacts: checkpoints, tensorboard logs, raw eval dumps
+Results/Phase2/step_h_results/
+Results/Phase2/step_h_tdirect/
+Results/Phase2/step_i_results/
+Results/Phase2/step_j_results/
+Results/Phase2/step_k_results/
+Results/Phase2/step_s/
+Results/Phase2/step_s_plots/
+Results/Phase2/step_s_plots.zip
+Results/Phase2/training/

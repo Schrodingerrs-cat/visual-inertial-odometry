@@ -103,10 +103,10 @@ class Viewer(object):
                 gl.glColor3f(0.0, 0.0, 1.0)
                 pangolin.DrawCameras(np.array([camera]), 0.5)
 
-            # ground-truth trajectory (red/pink)
+            # ground-truth trajectory (red)
             if self.gt_trajectory is not None and len(self.gt_trajectory) > 0:
                 gl.glLineWidth(2)
-                gl.glColor3f(1.0, 0.3, 0.5)
+                gl.glColor3f(1.0, 0.0, 0.0)
                 pangolin.DrawLine(self.gt_trajectory)
 
             # show estimated trajectory

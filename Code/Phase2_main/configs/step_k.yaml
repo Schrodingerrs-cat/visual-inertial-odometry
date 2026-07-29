@@ -1,0 +1,179 @@
+# Phase 2 Step K configuration. RAFT knowledge distillation + structural-
+# family + speed-diverse transfer test. V architecture is identical to
+# Step J (NetworkV_tdirect); only the training loss, the data set, and
+# the trajectory speed range change.
+#
+# Hypothesis (revised after Step J cross-family eval = 10.85 m):
+#   Step J's V memorised the simple_figure8/circle/ellipse parametric form
+#   AND only ever saw motion magnitudes ~0.4 m/s. Cross-family failure
+#   was driven by BOTH shape novelty AND motion-magnitude novelty.
+#   Step K therefore expands training along TWO axes simultaneously —
+#   shape (4 train shapes) and peak motion magnitude (0.1—0.5 m/s) — and
+#   adds RAFT distillation as a regulariser. Test set probes shape
+#   generalisation at both seen and unseen speeds, plus a NEW shape
+#   (sinusoid_30s) at controlled speed that decouples shape from the
+#   length / aggressive-accel confounds of the original sinusoid family.
+#
+# Experimental design — speed-diverse training set:
+#   SMOOTH (smooth curvature, no corners): circle + figure_8, each at two
+#     speeds (gentle / fast). Held-outs: ellipse @ mid + fast.
+#   POINTY (corners, direction reversals): diamond + zigzag, each at two
+#     speeds (mid / fast). Held-outs: triangle @ mid + fast.
+#   NEW SHAPE: simple_sinusoid_30s @ 0.5 m/s — single test point isolating
+#     sinusoidal-shape generalisation from the 100s + aggressive-motion
+#     confound of trajs 3 / 100-102.
+#
+# Train (8): 312-319 (4 shapes × 2 speeds each — see TRAJ_ID_MAP).
+# Val (1):   320  (simple_ellipse 0.3 m/s — drives best.pt).
+# Test (5):  320, 321, 322, 323, 324
+#   320, 321 — smooth held-out (ellipse) @ mid / fast
+#   322, 323 — pointy held-out (triangle) @ mid / fast
+#   324      — sinusoid_30s @ 0.5 m/s — KEY ABLATION
+# Minitest (training diagnostic): 322 (triangle mid-speed).
+#
+# What changes vs Step J:
+#   * 13 new trajectories (312-324) at varying speeds 0.1—0.5 m/s
+#   * loss adds distill section (lambda, sigma_eps_t, sigma_eps_R)
+#   * train_v is replaced with train_v_distill (loads cached RAFT)
+#   * I baseline is RETRAINED on the new train_ids
+#   * paths.outputs_dir = outputs/step_k
+#
+# What stays the same vs Step J:
+#   * V architecture: NetworkV_tdirect (drop-in compatible checkpoint)
+#   * Data dir: data/raw_g/  (Step K renders trajs 312-324 into the same
+#                              directory; trajs 0-307 untouched)
+#   * Same shared texture (tex_03.webp) across all train + test ids
+#   * stage2_lr_mult: 0.0 (lesson L1 — V/I frozen during VI Stage 2)
+#
+# Decision tree lives in outputs/step_k/CHANGES.md.
+
+seed: 42
+
+texture:
+  raw_dir: Data/textures_raw
+  processed_dir: Data/textures_processed
+  train_dir: Data/textures_train
+  test_dir: Data/textures_test
+  plane_longer_m: 28.0
+  density_target_px_per_m: 100.0
+
+camera:
+  fx: 640.0                              # used by distill loss for σ unit conv
+  fy: 640.0
+  cx: 320.0
+  cy: 240.0
+
+image:
+  width: 640
+  height: 480
+
+data:
+  raw_dir: data/raw_g                    # SHARED with Step J; new trajs
+                                          # 312..324 rendered into the same
+                                          # dir by step_k_render.sh.
+  train_ids: [312, 313, 314, 315,
+              316, 317, 318, 319]        # 4 shapes × 2 speeds each
+                                          #  (circle/figure_8/diamond/zigzag,
+                                          #  speeds 0.1, 0.15, 0.2, 0.4, 0.5).
+                                          # See blender/generate_data.py
+                                          # TRAJ_ID_MAP for the exact
+                                          # (shape, seed, speed) triple
+                                          # per traj_id.
+  val_traj_id: 320                       # held-out simple_ellipse @ 0.3 m/s
+                                          # → drives best.pt selector. Shape
+                                          # never seen during training.
+  minitest_traj_id: 322                  # held-out simple_triangle @ 0.3 m/s
+                                          # → train-time diagnostic for the
+                                          # pointy family. Distinct from
+                                          # val_traj_id so we monitor BOTH
+                                          # held-out shape transfers.
+  test_ids: [320, 321, 322, 323, 324]    # 320 = ellipse  mid-speed (val/test)
+                                          # 321 = ellipse  fast (OOD speed)
+                                          # 322 = triangle mid-speed
+                                          # 323 = triangle fast (OOD speed)
+                                          # 324 = sinusoid_30s @ 0.5 m/s
+                                          #       (NEW shape — single
+                                          #       cleanest probe of
+                                          #       sinusoidal-shape
+                                          #       generalisation).
+                                          # 320, 322 are val/minitest →
+                                          # those numbers are
+                                          # model-selection diagnostics.
+                                          # The genuinely held-out tests
+                                          # are (321, 323, 324) — averaged
+                                          # separately in step_k_eval.sh.
+  img_size: [480, 640]
+  imu_window: 10
+  num_workers: 4
+
+model:
+  cnn_feat_dim: 512
+  lstm_hidden: 128
+  variant: tdirect                       # asserted by train/eval scripts
+
+train:
+  batch_size: 8
+  lr: 1.0e-4
+  weight_decay: 1.0e-4
+  epochs_v: 30                           # student schedule
+  epochs_i: 20                           # unused (I symlinked from Step J)
+  epochs_vi_stage1: 10
+  epochs_vi_stage2: 20
+  stage2_lr_mult: 0.0                    # L1: V/I FROZEN in Stage 2.
+  grad_clip: 1.0
+  warmup_epochs: 2
+  log_every: 50
+
+loss:
+  w_rot: 10.0
+  w_t: 5.0
+  w_trans: 5.0                           # used by VI fused-pose term
+  w_imu_trans: 2.0                       # IMU branch in VI
+  w_rot_imu: 5.0                         # IMU branch in VI
+  hover_mask_center: 0.01
+  hover_mask_width: 0.005
+
+# NEW Step K block — Read by scripts/train_v_distill.py and
+# models/losses_distill.py::TDirectDistillLoss.
+distill:
+  lambda: 1.0                            # multiplier on combined distill term
+  sigma_eps_t: 0.001                     # ε in 1/(σ_t² + ε²); units: metres
+  sigma_eps_R: 0.005                     # ε in 1/(σ_R² + ε²); units: radians
+  sigma_px_floor: 0.5                    # clip σ_b_px from below (over-conf)
+  # Fallback weights if precompute reveals carpet uniformity (mean σ_b > 20 px):
+  raft_weights: "Raft_Large_Weights.C_T_SKHT_V2"
+  raft_weights_fallback: "Raft_Large_Weights.C_T_V2"
+
+raft:
+  num_flow_updates: 12
+  correspondence_stride: 16
+  ransac_threshold_px: 2.0
+  fb_valid_threshold_px: 5.0
+
+augmentation:
+  photometric:
+    enabled: true                        # Note: cache is on CLEAN frames;
+    brightness: 0.3                       # student sees augmented frames →
+    contrast: 0.3                         # intentional augmentation
+    saturation: 0.2                       # invariance, not a leak.
+    hue: 0.05
+    gaussian_noise_std: 0.01
+    grayscale_prob: 0.1
+
+sampling:
+  mode: weighted
+  alpha: 0.5
+  num_bins: 5
+  bin_edges_m: [0.0, 0.02, 0.04, 0.06, 0.10, 0.50]
+
+eval:
+  segment_seconds: 2.0
+  evo_bin: evo_ape
+
+paths:
+  outputs_dir:       outputs/step_k
+  checkpoints_dir:   outputs/step_k
+  trajectories_dir:  outputs/step_k/eval/trajectories
+  plots_dir:         outputs/step_k/eval/plots
+  studies_dir:       outputs/step_k/studies
+  sanity_dir:        outputs/step_k/sanity

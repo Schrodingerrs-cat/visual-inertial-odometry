@@ -2,16 +2,18 @@
 Single-window live viewer (OpenCV-only).
 
 Shows one 'S-MSCKF Viewer' window combining:
-  * left panel  — top-down XY trajectory (GT pink, estimate black, latest blue)
+  * left panel  — top-down XY trajectory (GT red, estimate black, latest blue)
   * right panel — live left-camera frame
   * bottom bar  — pose count + sequence time
 
 GT is expected already in the filter frame (vio.py does the Umeyama alignment).
 """
 import time
+import threading
+from queue import Queue
+
 import numpy as np
 import cv2
-from multiprocessing import Process, Queue
 
 
 WIN_W = 1280
@@ -21,7 +23,7 @@ PAD = 24
 BAR_H = 36
 PLOT_H = WIN_H - BAR_H
 
-PINK = (180, 90, 250)     # BGR
+RED = (0, 0, 255)         # BGR
 BLACK = (20, 20, 20)
 BLUE = (220, 80, 40)
 GRID = (225, 225, 225)
@@ -83,7 +85,7 @@ def _draw_plot_chrome(canvas, to_px, bounds, scale):
                 cv2.FONT_HERSHEY_SIMPLEX, 0.55, TEXT, 1, cv2.LINE_AA)
     # legend
     lx = LEFT_W - 210
-    cv2.line(canvas, (lx, 14), (lx + 28, 14), PINK, 3, cv2.LINE_AA)
+    cv2.line(canvas, (lx, 14), (lx + 28, 14), RED, 3, cv2.LINE_AA)
     cv2.putText(canvas, 'Ground truth', (lx + 36, 18),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.45, TEXT, 1, cv2.LINE_AA)
     cv2.line(canvas, (lx, 30), (lx + 28, 30), BLACK, 3, cv2.LINE_AA)
@@ -125,15 +127,19 @@ def _compose(traj_canvas, img_panel, bar_text):
 
 class Viewer(object):
     def __init__(self, gt_trajectory=None):
-        self.image_queue = Queue()
+        # Pose is tiny (4x4 float64) — small unbounded queue is fine.
         self.pose_queue = Queue()
+        # Image is large; keep only the latest frame in a lock-guarded slot
+        # so a slow consumer can't build backlog and freeze the panel.
+        self._img_lock = threading.Lock()
+        self._latest_img = None
         self.gt_trajectory = (
             np.asarray(gt_trajectory, dtype=np.float64)
             if gt_trajectory is not None else None)
 
-        self.view_thread = Process(target=self._run,
-                                   args=(self.pose_queue, self.image_queue,
-                                         self.gt_trajectory))
+        # Thread (not Process) so numpy arrays pass by reference — no pickling
+        # across a pipe, no backpressure-induced stalls.
+        self.view_thread = threading.Thread(target=self._run)
         self.view_thread.daemon = True
         self.view_thread.start()
 
@@ -147,10 +153,12 @@ class Viewer(object):
             return
         if image.ndim == 2:
             image = np.repeat(image[..., np.newaxis], 3, axis=2)
-        self.image_queue.put(image)
+        with self._img_lock:
+            self._latest_img = image
 
-    @staticmethod
-    def _run(pose_queue, image_queue, gt):
+    def _run(self):
+        pose_queue = self.pose_queue
+        gt = self.gt_trajectory
         to_px, bounds, scale = _build_to_px(gt)
 
         base = np.full((PLOT_H, LEFT_W, 3), BG, dtype=np.uint8)
@@ -158,14 +166,12 @@ class Viewer(object):
         if gt is not None and len(gt) >= 2:
             gt_px = np.array([to_px(p[0], p[1]) for p in gt])
             cv2.polylines(base, [gt_px], isClosed=False,
-                          color=PINK, thickness=2, lineType=cv2.LINE_AA)
+                          color=RED, thickness=2, lineType=cv2.LINE_AA)
 
         cv2.namedWindow('S-MSCKF Viewer', cv2.WINDOW_AUTOSIZE)
 
         traj_px = []
-        latest_img = None
         t_start = time.time()
-        latest_ts = None
 
         while True:
             while not pose_queue.empty():
@@ -177,11 +183,8 @@ class Viewer(object):
                 x, y, _z = pose[:3, 3]
                 traj_px.append(to_px(x, y))
 
-            while not image_queue.empty():
-                try:
-                    latest_img = image_queue.get_nowait()
-                except Exception:
-                    break
+            with self._img_lock:
+                latest_img = self._latest_img
 
             canvas = base.copy()
             if len(traj_px) >= 2:

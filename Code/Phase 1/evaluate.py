@@ -100,15 +100,15 @@ def plot(aligned_est, gt, out_png, title=''):
     except Exception:
         return False
     fig, ax = plt.subplots(1, 2, figsize=(12, 5))
-    ax[0].plot(gt[:, 0], gt[:, 1], 'k-', label='GT', linewidth=1)
-    ax[0].plot(aligned_est[:, 0], aligned_est[:, 1], 'r-', label='MSCKF', linewidth=1)
+    ax[0].plot(gt[:, 0], gt[:, 1], 'r-', label='GT', linewidth=1)
+    ax[0].plot(aligned_est[:, 0], aligned_est[:, 1], 'b-', label='MSCKF', linewidth=1)
     ax[0].set_xlabel('x [m]'); ax[0].set_ylabel('y [m]')
     ax[0].set_title(f'{title} (top-down)')
     ax[0].axis('equal'); ax[0].legend(); ax[0].grid(True)
 
     t = np.arange(len(gt))
-    ax[1].plot(t, gt[:, 2], 'k-', label='GT z', linewidth=1)
-    ax[1].plot(t, aligned_est[:, 2], 'r-', label='MSCKF z', linewidth=1)
+    ax[1].plot(t, gt[:, 2], 'r-', label='GT z', linewidth=1)
+    ax[1].plot(t, aligned_est[:, 2], 'b-', label='MSCKF z', linewidth=1)
     ax[1].set_xlabel('sample'); ax[1].set_ylabel('z [m]')
     ax[1].set_title('altitude'); ax[1].legend(); ax[1].grid(True)
     plt.tight_layout()

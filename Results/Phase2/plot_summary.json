@@ -1,0 +1,27 @@
+{
+  "outputs": "../../Results/Phase2/step_s",
+  "results": "/home/aryans-cat/Desktop/Studies/CV/Visual Inertial Odometry/Results/Phase2",
+  "methods": [
+    "v",
+    "i",
+    "vi",
+    "vi_concat",
+    "vi_no_decomp",
+    "vi_concat_decompose"
+  ],
+  "traj_ids": [
+    0,
+    1,
+    2,
+    3,
+    100,
+    101,
+    102
+  ],
+  "stages_run": [
+    "training"
+  ],
+  "timings": {
+    "training": 0.9950234889984131
+  }
+}
