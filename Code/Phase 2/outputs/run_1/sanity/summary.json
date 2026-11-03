@@ -1,0 +1,203 @@
+[
+  {
+    "name": "pose_chaining",
+    "passed": true,
+    "message": "max |\u0394t| err = 3.78e-13 m, max |R err| = 2.57e-13",
+    "details": {
+      "err_t": 3.7819717594272567e-13,
+      "err_R": 2.571016884610028e-13
+    }
+  },
+  {
+    "name": "imu_integration",
+    "passed": true,
+    "message": "IMU integration max drift = 0.020 m, end drift = 0.020 m",
+    "details": {
+      "max_drift_m": 0.020430500353301854,
+      "end_drift_m": 0.020430500353301854
+    }
+  },
+  {
+    "name": "homography_warp",
+    "passed": true,
+    "message": "photometric MAE (inner) = 0.40",
+    "details": {
+      "mae": 0.3971964418888092
+    }
+  },
+  {
+    "name": "motion_histogram",
+    "passed": true,
+    "message": "median |\u0394t| = 3.30 cm (bounds [3.0, 8.0]); median |\u0394R| = 0.30 deg",
+    "details": {
+      "median_dt_cm": 3.303900932052252,
+      "n_pairs": 4000
+    }
+  },
+  {
+    "name": "drone_dynamics",
+    "passed": false,
+    "message": "max |R_wb\u00b7[0,0,1] - (a+[0,0,g])/||\u00b7||| = 7.36e-01 (tol 1e-04); 10001/10001 samples kept",
+    "details": {
+      "max_err": 0.7360450433350607,
+      "tol": 0.0001,
+      "n_kept": 10001,
+      "n_total": 10001
+    }
+  },
+  {
+    "name": "motion_distribution",
+    "passed": false,
+    "message": "traj 0: <1cm 6.8%, 1\u201315cm 93.2%, >30cm 0; traj 1: <1cm 3.0%, 1\u201315cm 97.0%, >30cm 0; traj 2: <1cm 3.1%, 1\u201315cm 96.9%, >30cm 0; traj 3: <1cm 8.1%, 1\u201315cm 91.9%, >30cm 0",
+    "details": {
+      "per_traj": {
+        "0": {
+          "frac_lt_1cm": 0.06826143529176258,
+          "frac_in_1_to_15cm": 0.9317385647082375,
+          "n_over_30cm": 0,
+          "passed": false
+        },
+        "1": {
+          "frac_lt_1cm": 0.029926934240816733,
+          "frac_in_1_to_15cm": 0.9700730657591833,
+          "n_over_30cm": 0,
+          "passed": true
+        },
+        "2": {
+          "frac_lt_1cm": 0.031128015213692323,
+          "frac_in_1_to_15cm": 0.9688719847863076,
+          "n_over_30cm": 0,
+          "passed": true
+        },
+        "3": {
+          "frac_lt_1cm": 0.08087278550695626,
+          "frac_in_1_to_15cm": 0.9191272144930437,
+          "n_over_30cm": 0,
+          "passed": false
+        }
+      }
+    }
+  },
+  {
+    "name": "footprint_confinement",
+    "passed": true,
+    "message": "traj 0: min margin XY = (32.41, 19.80) m; traj 1: min margin XY = (32.36, 20.47) m; traj 2: min margin XY = (32.96, 20.51) m; traj 3: min margin XY = (32.95, 16.44) m; traj 100: min margin XY = (19.69, 31.26) m; traj 101: min margin XY = (31.98, 25.80) m; traj 102: min margin XY = (32.63, 20.05) m; traj 200: min margin XY = (22.56, 35.15) m",
+    "details": {
+      "per_traj": {
+        "0": {
+          "plane_x": 75.0,
+          "plane_y": 49.96006389776358,
+          "worst_x_margin_m": 32.41464957574432,
+          "worst_y_margin_m": 19.79672757056807,
+          "passed": true
+        },
+        "1": {
+          "plane_x": 75.0,
+          "plane_y": 49.96006389776358,
+          "worst_x_margin_m": 32.363129207362356,
+          "worst_y_margin_m": 20.471341928059232,
+          "passed": true
+        },
+        "2": {
+          "plane_x": 75.0,
+          "plane_y": 49.96006389776358,
+          "worst_x_margin_m": 32.964196685816226,
+          "worst_y_margin_m": 20.51002126661006,
+          "passed": true
+        },
+        "3": {
+          "plane_x": 75.0,
+          "plane_y": 42.1875,
+          "worst_x_margin_m": 32.95365635195564,
+          "worst_y_margin_m": 16.43578461695107,
+          "passed": true
+        },
+        "100": {
+          "plane_x": 50.19968051118211,
+          "plane_y": 75.0,
+          "worst_x_margin_m": 19.693550440044145,
+          "worst_y_margin_m": 31.264658500211127,
+          "passed": true
+        },
+        "101": {
+          "plane_x": 75.0,
+          "plane_y": 60.005631687629055,
+          "worst_x_margin_m": 31.983554313491574,
+          "worst_y_margin_m": 25.803514860150926,
+          "passed": true
+        },
+        "102": {
+          "plane_x": 75.0,
+          "plane_y": 49.96006389776358,
+          "worst_x_margin_m": 32.626861340160445,
+          "worst_y_margin_m": 20.051541813805095,
+          "passed": true
+        },
+        "200": {
+          "plane_x": 50.19968051118211,
+          "plane_y": 75.0,
+          "worst_x_margin_m": 22.55999328422292,
+          "worst_y_margin_m": 35.14840539827272,
+          "passed": true
+        }
+      }
+    }
+  },
+  {
+    "name": "texture_assignment",
+    "passed": true,
+    "message": "all expected textures present",
+    "details": {
+      "per_traj": {
+        "0": {
+          "texture_name": "tex_00.webp",
+          "texture_pool": "train",
+          "texture_path": "Data/textures_train/tex_00.webp",
+          "passed": true
+        },
+        "1": {
+          "texture_name": "tex_01.webp",
+          "texture_pool": "train",
+          "texture_path": "Data/textures_train/tex_01.webp",
+          "passed": true
+        },
+        "2": {
+          "texture_name": "tex_02.webp",
+          "texture_pool": "train",
+          "texture_path": "Data/textures_train/tex_02.webp",
+          "passed": true
+        },
+        "3": {
+          "texture_name": "tex_03.webp",
+          "texture_pool": "train",
+          "texture_path": "Data/textures_train/tex_03.webp",
+          "passed": true
+        },
+        "100": {
+          "texture_name": "tex_05.webp",
+          "texture_pool": "test",
+          "texture_path": "Data/textures_test/tex_05.webp",
+          "passed": true
+        },
+        "101": {
+          "texture_name": "tex_06.webp",
+          "texture_pool": "test",
+          "texture_path": "Data/textures_test/tex_06.webp",
+          "passed": true
+        },
+        "102": {
+          "texture_name": "tex_00.webp",
+          "texture_pool": "train",
+          "texture_path": "Data/textures_train/tex_00.webp",
+          "passed": true
+        },
+        "200": {
+          "texture_name": "tex_04.webp",
+          "texture_pool": "train",
+          "texture_path": "Data/textures_train/tex_04.webp",
+          "passed": true
+        }
+      }
+    }
+  }
+]

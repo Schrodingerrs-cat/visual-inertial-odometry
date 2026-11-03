@@ -1,0 +1,10 @@
+.venv/
+blender_app/
+third_party/
+data/raw/
+data/processed/
+outputs/
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store

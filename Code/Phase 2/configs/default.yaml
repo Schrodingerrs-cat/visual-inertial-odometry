@@ -1,0 +1,122 @@
+# Phase 2 default configuration. Every script reads this file unless --config
+# is passed. Paths are relative to the Phase 2 folder root.
+
+seed: 42
+
+texture:
+  raw_dir: Data/textures_raw           # user drops 5 carpet images here
+  processed_dir: Data/textures_processed
+  train_dir: Data/textures_train
+  test_dir: Data/textures_test
+  # stretched_per_image_v1 policy: plane dimensions are derived per-texture
+  # from the native aspect ratio. Longer edge = 28 m. Image content stretches
+  # 1:1 across plane UV (no cropping, no tiling). Altitude range 1.5–3 m.
+  #
+  # Raised 18 → 28 m on 2026-04-24 after flat_spiral motion analysis. At 18 m
+  # plane, flat_spiral (raw radius 7 m) got confinement_scale = 0.571, which
+  # scaled post-confinement velocity proportionally and dropped median optical
+  # flow to ~3.3 px/frame — below S3's ~5 px CNN floor. At 28 m longer edge
+  # (aspect 1.5 → 28×18.7 m), flat_spiral scale becomes ~0.89, post-confine
+  # velocity ~1.6 m/s, median flow ~5.1 px/frame — just above the floor.
+  # Effective carpet density drops but stays above the 100 px/m soft target
+  # for carpets with longer edge ≥ 2800 px (4 of 5 supplied carpets qualify;
+  # the Persian one at 2613 px gets a density warning at 93 px/m, not reject).
+  plane_longer_m: 28.0
+  density_target_px_per_m: 100.0       # warning threshold only, not gated
+
+camera:
+  # Intrinsics must match blender/generate_data.py K_MATRIX. HFOV 53°.
+  fx: 640.0
+  fy: 640.0
+  cx: 320.0
+  cy: 240.0
+
+image:
+  width: 640
+  height: 480
+
+data:
+  raw_dir: data/raw
+  train_ids: [0, 1, 2, 3]
+  test_ids:  [100, 101, 102]          # flat_spiral, figure_8, clover
+  val_traj_id: 0                       # in-distribution val (train split member)
+  minitest_traj_id: 200                # OOD val (short clover, traj 200)
+  img_size: [480, 640]                 # (H, W). Matches the Blender render.
+  imu_window: 10                       # 10 IMU samples between kept frames.
+  num_workers: 4
+
+model:
+  cnn_feat_dim: 512
+  lstm_hidden: 128
+  normal_init_bias: [0.0, 0.0, 1.0]
+
+train:
+  # Batch reduced from 16 → 8 for the 640×480 image budget (4× pixels vs
+  # 240×320). If OOM persists on rtx_pro_6000_b (48 GB), drop to 4 and add
+  # gradient checkpointing to models/backbones.py VGG8Backbone.
+  batch_size: 8
+  lr: 1.0e-4
+  weight_decay: 1.0e-4
+  # Epoch counts raised 2026-04-24 after S6 diagnostic showed V train_loss
+  # still descending at −0.006/epoch at epoch 15. We were stopping mid-descent
+  # — that's undertraining, not a capacity ceiling.
+  epochs_v: 30                          # was 15
+  epochs_i: 20                          # was 12
+  epochs_vi_stage1: 10                  # was 6
+  epochs_vi_stage2: 20                  # was 10
+  stage2_lr_mult: 0.25
+  grad_clip: 1.0
+  warmup_epochs: 2
+  log_every: 50
+
+loss:
+  # Rebalanced 2026-04-23 after diagnose_td_collapse.py showed V's td head
+  # collapsed to a constant. Root cause: w_rot·L_rot ≈ 0.1 vs w_td·L_td ≈ 0.008
+  # (12× imbalance) → td head was gradient-starved, weight decay pulled it to
+  # near-zero constant bias.
+  w_rot: 10.0
+  w_td: 20.0               # was 1.0 — now comparable to w_rot·L_rot magnitude
+  w_n: 0.1
+  w_warp: 0.1
+  w_trans: 5.0             # was 1.0 — same issue on VI fused translation
+  w_imu_trans: 2.0         # was 0.5
+  w_rot_imu: 5.0
+  w_d: 0.5
+  # Tier-1 B.1 smooth hover mask: sigmoid((|Δt| - center) / width).
+  hover_mask_center: 0.01
+  hover_mask_width: 0.005
+
+augmentation:
+  photometric:                         # Tier-1 texture-invariance
+    enabled: true
+    brightness: 0.3
+    contrast: 0.3
+    saturation: 0.2
+    hue: 0.05
+    gaussian_noise_std: 0.01
+    grayscale_prob: 0.1
+
+sampling:
+  # Tier-1 B.2: weighted sampler with soft rebalancing.
+  mode: weighted                       # options: weighted | naive | small_only
+  alpha: 0.5                           # 0 uniform, 0.5 soft, 1 strict
+  num_bins: 5
+  bin_edges_m: [0.0, 0.02, 0.04, 0.06, 0.10, 0.50]  # explicit edges override quantile binning
+
+eval:
+  segment_seconds: 2.0
+  evo_bin: evo_ape                     # on PATH after source .venv/bin/activate
+  fallback_threshold: 0.005            # Tier-1 B.3: swap to IMU pose when ||td_v|| < this.
+  #                                      Lowered from 0.05 (2026-04-23): with
+  #                                      altitude ≈ 2 m and ~3 cm/frame motion,
+  #                                      ||td_gt|| naturally sits at ~0.02 m/m.
+  #                                      5th-percentile of GT is ≈0.01; 0.005
+  #                                      catches only near-hover (bottom ~5%).
+
+paths:
+  outputs_dir: outputs
+  checkpoints_dir: outputs
+  trajectories_dir: outputs/trajectories
+  plots_dir: outputs/plots
+  studies_dir: outputs/studies
+  sanity_dir: outputs/sanity

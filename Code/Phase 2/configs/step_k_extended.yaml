@@ -1,0 +1,132 @@
+# Phase 2 Step K extended eval — held-out instances of the 4 *trained*
+# shape families at intermediate (unseen) speeds. Reuses Step K's
+# checkpoints (outputs/step_k/{v,i,vi}/best.pt) and evaluates them on
+# four new test trajectories that probe within-family generalisation:
+#
+#   325 simple_figure8 @ 0.30 m/s (seed 6001)
+#   326 simple_circle  @ 0.25 m/s (seed 6002)
+#   327 simple_diamond @ 0.30 m/s (seed 6003)
+#   328 simple_zigzag  @ 0.30 m/s (seed 6004)
+#
+# Training seeds were 5001-5008; speeds were {0.1, 0.15, 0.2, 0.4, 0.5}.
+# These four held-out instances thus differ in BOTH seed and speed from
+# every trained trajectory of the same shape — a clean within-family
+# generalisation probe.
+#
+# Decision tree for Q1:
+#   * All 4 V_ate_aligned < 0.5m AND seg2s_median < 0.1m
+#       → broad within-family generalisation
+#   * Some succeed, others fail → shape-specific
+#   * All > 1m → narrow generalisation (0.184m on ellipse / triangle /
+#       sinusoid_30s was specific to those families)
+#
+# What changes vs configs/step_k.yaml:
+#   * data.test_ids = [325, 326, 327, 328]
+#   * paths.outputs_dir = outputs/step_k_extended
+#
+# What stays the same:
+#   * data.raw_dir = data/raw_g  (new trajs render here, same as 312-324)
+#   * model.variant = tdirect  (matches checkpoints in outputs/step_k)
+#   * eval segment / alignment math identical to Step K.
+
+seed: 42
+
+texture:
+  raw_dir: Data/textures_raw
+  processed_dir: Data/textures_processed
+  train_dir: Data/textures_train
+  test_dir: Data/textures_test
+  plane_longer_m: 28.0
+  density_target_px_per_m: 100.0
+
+camera:
+  fx: 640.0
+  fy: 640.0
+  cx: 320.0
+  cy: 240.0
+
+image:
+  width: 640
+  height: 480
+
+data:
+  raw_dir: data/raw_g                    # Step K's render dir; new trajs
+                                          # 325-328 land here too.
+  train_ids: [312, 313, 314, 315,
+              316, 317, 318, 319]        # unused by eval; kept for
+                                          # load_config() symmetry.
+  val_traj_id: 320                       # unused by eval
+  minitest_traj_id: 322                  # unused by eval
+  test_ids: [325, 326, 327, 328]         # held-out within-family probes
+  img_size: [480, 640]
+  imu_window: 10
+  num_workers: 4
+
+model:
+  cnn_feat_dim: 512
+  lstm_hidden: 128
+  variant: tdirect
+
+train:
+  batch_size: 8
+  lr: 1.0e-4
+  weight_decay: 1.0e-4
+  epochs_v: 30
+  epochs_i: 20
+  epochs_vi_stage1: 10
+  epochs_vi_stage2: 20
+  stage2_lr_mult: 0.0
+  grad_clip: 1.0
+  warmup_epochs: 2
+  log_every: 50
+
+loss:
+  w_rot: 10.0
+  w_t: 5.0
+  w_trans: 5.0
+  w_imu_trans: 2.0
+  w_rot_imu: 5.0
+  hover_mask_center: 0.01
+  hover_mask_width: 0.005
+
+distill:
+  lambda: 1.0
+  sigma_eps_t: 0.001
+  sigma_eps_R: 0.005
+  sigma_px_floor: 0.5
+  raft_weights: "Raft_Large_Weights.C_T_SKHT_V2"
+  raft_weights_fallback: "Raft_Large_Weights.C_T_V2"
+
+raft:
+  num_flow_updates: 12
+  correspondence_stride: 16
+  ransac_threshold_px: 2.0
+  fb_valid_threshold_px: 5.0
+
+augmentation:
+  photometric:
+    enabled: true
+    brightness: 0.3
+    contrast: 0.3
+    saturation: 0.2
+    hue: 0.05
+    gaussian_noise_std: 0.01
+    grayscale_prob: 0.1
+
+sampling:
+  mode: weighted
+  alpha: 0.5
+  num_bins: 5
+  bin_edges_m: [0.0, 0.02, 0.04, 0.06, 0.10, 0.50]
+
+eval:
+  segment_seconds: 2.0
+  evo_bin: evo_ape
+
+paths:
+  outputs_dir:       outputs/step_k_extended
+  checkpoints_dir:   outputs/step_k_extended
+  trajectories_dir:  outputs/step_k_extended/eval/trajectories
+  plots_dir:         outputs/step_k_extended/eval/plots
+  studies_dir:       outputs/step_k_extended/studies
+  sanity_dir:        outputs/step_k_extended/sanity

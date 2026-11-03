@@ -1,0 +1,121 @@
+# Phase 2 Step J configuration. Retrain V/I/VI from scratch on SIMPLE 30 s
+# trajectories (figure-8, circle, ellipse) on tex_03. Tests the hypothesis
+# that V's representation ceiling in Steps G/H (3.86 m on held-out sinusoid)
+# was due to training on 100 s sum-of-sinusoids that are too complex —
+# simpler training data may let V converge cleanly.
+#
+# What changes vs Step H:
+#   * data.train_ids = [301, 302, 303, 304] (simple shapes, was [0, 1, 2])
+#   * data.val_traj_id   = 305 (held-out simple_figure8, was 3)
+#   * data.minitest_traj_id = 305
+#   * data.test_ids = [305, 306, 307, 300]
+#       - 305 in test for diagnostic (val == minitest in this run)
+#       - 306, 307 = held-out within-family (circle, ellipse)
+#       - 300 = bonus held-out figure-8 from Step I (already rendered)
+#   * train.stage2_lr_mult = 0.0 (lesson L1: V/I stay frozen in Stage 2 so
+#     the VI vs (V, I) attribution is clean — Step I muddied this with 0.25)
+#   * paths.outputs_dir = outputs/step_j
+#
+# What stays the same vs Step H:
+#   * model.variant = tdirect (NetworkV_tdirect + NetworkVI_tdirect)
+#   * Loss weights (w_rot, w_t, w_trans, w_imu_trans, w_rot_imu, hover_*)
+#   * Photometric augmentation, weighted sampling, hover-weighted L1.
+#
+# Step J tests:
+#   1. Does V converge on simple shapes? (V_test_avg < 1.5 m → yes.)
+#   2. Within-family generalization on circle / ellipse held-out seeds.
+#   3. Whether VI fusion finally beats I when V is good.
+#
+# Decision tree lives in outputs/step_j/CHANGES.md.
+
+seed: 42
+
+texture:
+  raw_dir: Data/textures_raw
+  processed_dir: Data/textures_processed
+  train_dir: Data/textures_train
+  test_dir: Data/textures_test
+  plane_longer_m: 28.0
+  density_target_px_per_m: 100.0
+
+camera:
+  fx: 640.0
+  fy: 640.0
+  cx: 320.0
+  cy: 240.0
+
+image:
+  width: 640
+  height: 480
+
+data:
+  raw_dir: data/raw_g                   # REUSE Step G/H/I data dir; trajs
+                                         # 301..307 rendered into the same
+                                         # directory by step_j_render.sh.
+  train_ids: [301, 302, 303, 304]        # simple_figure8 / circle / ellipse
+  val_traj_id: 305                       # held-out simple_figure8 (val)
+  minitest_traj_id: 305                  # drives best.pt selector → 305
+  test_ids: [305, 306, 307, 300]         # 305 diagnostic, 306/307 held-out
+                                          # within-family, 300 bonus reuse
+  img_size: [480, 640]
+  imu_window: 10
+  num_workers: 4
+
+model:
+  cnn_feat_dim: 512
+  lstm_hidden: 128
+  variant: tdirect                       # train_v_tdirect / train_vi_tdirect
+                                          # / evaluate_tdirect assert this.
+
+train:
+  batch_size: 8
+  lr: 1.0e-4
+  weight_decay: 1.0e-4
+  epochs_v: 30
+  epochs_i: 20
+  epochs_vi_stage1: 10
+  epochs_vi_stage2: 20
+  stage2_lr_mult: 0.0                    # L1: V/I FROZEN in Stage 2.
+                                          # train_vi_tdirect.py:241-250 keeps
+                                          # backbones in the optimizer with
+                                          # lr=0; Adam · 0 = no weight update.
+  grad_clip: 1.0
+  warmup_epochs: 2
+  log_every: 50
+
+loss:
+  w_rot: 10.0
+  w_t: 5.0
+  w_trans: 5.0
+  w_imu_trans: 2.0
+  w_rot_imu: 5.0
+  hover_mask_center: 0.01
+  hover_mask_width: 0.005
+
+augmentation:
+  photometric:
+    enabled: true
+    brightness: 0.3
+    contrast: 0.3
+    saturation: 0.2
+    hue: 0.05
+    gaussian_noise_std: 0.01
+    grayscale_prob: 0.1
+
+sampling:
+  mode: weighted
+  alpha: 0.5
+  num_bins: 5
+  bin_edges_m: [0.0, 0.02, 0.04, 0.06, 0.10, 0.50]
+
+eval:
+  segment_seconds: 2.0
+  evo_bin: evo_ape
+
+paths:
+  outputs_dir:       outputs/step_j
+  checkpoints_dir:   outputs/step_j
+  trajectories_dir:  outputs/step_j/eval/trajectories
+  plots_dir:         outputs/step_j/eval/plots
+  studies_dir:       outputs/step_j/studies
+  sanity_dir:        outputs/step_j/sanity

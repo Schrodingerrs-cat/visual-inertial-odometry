@@ -1,0 +1,121 @@
+# Phase 2 Step J cross-family eval. Re-uses Step J's TRAINED V/I/VI
+# checkpoints (outputs/step_j/{v,i,vi}/best.pt) and evaluates them on the
+# original Step F/G test trajectories that V repeatedly failed on.
+#
+# This tests whether Step J's V (trained on simple 30 s figure-8 / circle /
+# ellipse) generalizes outside its narrow training family, or only works on
+# trajectories that share parametric form with the training set.
+#
+# Test trajectories:
+#   * traj 3   — sinusoid (TRAJ_ID_MAP[3] = ("train","sinusoid",1003)). 100 s.
+#                Pure trajectory-shape generalization: tex_03 is shared with
+#                Step J's training (TEXTURE_ASSIGNMENT[3] = "tex_03.webp"),
+#                so this is a clean shape-only OOD test.
+#   * traj 100 — flat_spiral, tex_04 (held-out). Shape + texture shift.
+#   * traj 101 — figure_8, tex_04 (held-out). Same family name as Step J's
+#                "simple_figure8" but DIFFERENT parametric form
+#                (sum-of-sinusoids per-axis amplitudes, not the 1·sin/2·sin
+#                figure-8 of the simple sampler) and different texture.
+#   * traj 102 — clover, tex_00 (seen-as-training-pool but never trained on
+#                in Step J — Step J's V only saw tex_03).
+#
+# What changes vs configs/step_j.yaml:
+#   * data.raw_dir = data/raw (Step F/G's render dir; trajs 3/100/101/102
+#     all live there). Step J's training data was data/raw_g/, so traj 3
+#     here uses the data/raw render which may differ in lighting/camera
+#     details from data/raw_g — accepted as a real shift V should handle.
+#   * data.test_ids = [3, 100, 101, 102]
+#   * paths.outputs_dir = outputs/step_j_crossfamily (new dir; we write a
+#     fresh results.csv so we don't pollute outputs/step_j/results.csv).
+#
+# What stays the same:
+#   * data.train_ids / val_traj_id / minitest_traj_id — unused by eval but
+#     kept for config-load symmetry (load_config() doesn't validate them).
+#   * model.variant = tdirect (asserted by evaluate_tdirect.py).
+#   * eval.* (segment_seconds, evo_bin) — same alignment math as step_j.
+
+seed: 42
+
+texture:
+  raw_dir: Data/textures_raw
+  processed_dir: Data/textures_processed
+  train_dir: Data/textures_train
+  test_dir: Data/textures_test
+  plane_longer_m: 28.0
+  density_target_px_per_m: 100.0
+
+camera:
+  fx: 640.0
+  fy: 640.0
+  cx: 320.0
+  cy: 240.0
+
+image:
+  width: 640
+  height: 480
+
+data:
+  raw_dir: data/raw                      # Step F/G's render; trajs
+                                          # 3, 100, 101, 102 all live here.
+  train_ids: [301, 302, 303, 304]        # unused by eval; matches step_j.yaml
+  val_traj_id: 305                       # unused by eval
+  minitest_traj_id: 305                  # unused by eval
+  test_ids: [3, 100, 101, 102]           # cross-family test set
+  img_size: [480, 640]
+  imu_window: 10
+  num_workers: 4
+
+model:
+  cnn_feat_dim: 512
+  lstm_hidden: 128
+  variant: tdirect
+
+train:
+  batch_size: 8
+  lr: 1.0e-4
+  weight_decay: 1.0e-4
+  epochs_v: 30
+  epochs_i: 20
+  epochs_vi_stage1: 10
+  epochs_vi_stage2: 20
+  stage2_lr_mult: 0.0
+  grad_clip: 1.0
+  warmup_epochs: 2
+  log_every: 50
+
+loss:
+  w_rot: 10.0
+  w_t: 5.0
+  w_trans: 5.0
+  w_imu_trans: 2.0
+  w_rot_imu: 5.0
+  hover_mask_center: 0.01
+  hover_mask_width: 0.005
+
+augmentation:
+  photometric:
+    enabled: true
+    brightness: 0.3
+    contrast: 0.3
+    saturation: 0.2
+    hue: 0.05
+    gaussian_noise_std: 0.01
+    grayscale_prob: 0.1
+
+sampling:
+  mode: weighted
+  alpha: 0.5
+  num_bins: 5
+  bin_edges_m: [0.0, 0.02, 0.04, 0.06, 0.10, 0.50]
+
+eval:
+  segment_seconds: 2.0
+  evo_bin: evo_ape
+
+paths:
+  outputs_dir:       outputs/step_j_crossfamily
+  checkpoints_dir:   outputs/step_j_crossfamily
+  trajectories_dir:  outputs/step_j_crossfamily/eval/trajectories
+  plots_dir:         outputs/step_j_crossfamily/eval/plots
+  studies_dir:       outputs/step_j_crossfamily/studies
+  sanity_dir:        outputs/step_j_crossfamily/sanity

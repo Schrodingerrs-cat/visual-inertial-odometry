@@ -1,0 +1,113 @@
+# Phase 2 Step I configuration. Photometric self-validation + IMU-anchored
+# soft fusion. Same data as Step H (data/raw_g) plus an additional simple
+# 30 s figure-8 trajectory (traj 300, rendered with tex_03) as a second
+# eval point.
+#
+# What changes vs Step H:
+#   * model.variant = "anchored" (was "tdirect")
+#   * data.test_ids = [3, 300] (was [3])
+#   * loss adds w_gate = 1.0 (gate supervision BCE)
+#   * No retraining of V or I — both symlinked from earlier steps:
+#       outputs/step_i/v -> ../step_h/v   (Step H's t-direct V)
+#       outputs/step_i/i -> ../step_g/i   (Step G's I)
+#     Only NetworkVI_anchored is trained from scratch.
+#
+# Step I tests:
+#   1. Soft IMU-anchored fusion: VI_traj_3 should NOT be worse than I_traj_3.
+#   2. Photometric self-validation: rho_v should correlate with V's actual
+#      per-frame error.
+#   3. Easy-trajectory benchmark: VI_traj_300 should clearly beat I_traj_300.
+#
+# Decision tree lives in outputs/step_i/CHANGES.md.
+
+seed: 42
+
+texture:
+  raw_dir: Data/textures_raw
+  processed_dir: Data/textures_processed
+  train_dir: Data/textures_train
+  test_dir: Data/textures_test
+  plane_longer_m: 28.0
+  density_target_px_per_m: 100.0
+
+camera:
+  fx: 640.0
+  fy: 640.0
+  cx: 320.0
+  cy: 240.0
+
+image:
+  width: 640
+  height: 480
+
+data:
+  raw_dir: data/raw_g                   # REUSE Step G/H data — no re-render
+                                         # of trajs 0..3. Traj 300 is rendered
+                                         # into the same dir by step_i_render.sh.
+  train_ids: [0, 1, 2]
+  val_traj_id: 3
+  minitest_traj_id: 3                   # drives best.pt selector to traj 3
+  test_ids:  [3, 300]                    # NEW: include simple figure-8
+  img_size: [480, 640]
+  imu_window: 10
+  num_workers: 4
+
+model:
+  cnn_feat_dim: 512
+  lstm_hidden: 128
+  variant: anchored                      # NEW: train_vi_anchored asserts this
+  # Anchored-specific knobs (passed to NetworkVI_anchored if desired; the
+  # constructor defaults already match Phase 2 conventions).
+  default_altitude_m: 4.0                 # eval-time photometric warp depth
+  rho_decay: 8.0                          # exp(-rho_decay · MAE) → rho ∈ [0,1]
+
+train:
+  batch_size: 8
+  lr: 1.0e-4
+  weight_decay: 1.0e-4
+  epochs_v: 30                          # unused (V is reused via symlink)
+  epochs_i: 20                          # unused (I is reused via symlink)
+  epochs_vi_stage1: 10
+  epochs_vi_stage2: 20
+  stage2_lr_mult: 0.25
+  grad_clip: 1.0
+  warmup_epochs: 2
+  log_every: 50
+
+loss:
+  w_rot: 10.0
+  w_t: 5.0
+  w_gate: 1.0                           # NEW: gate-supervision BCE weight
+  hover_mask_center: 0.01
+  hover_mask_width: 0.005
+  # No w_td, w_n, w_warp, w_d, w_trans, w_imu_trans, w_rot_imu — VILoss_anchored
+  # constructs all per-branch and fused-pose terms from w_rot and w_t alone
+  # (per-branch terms get a fixed 0.5 multiplier; fused gets 1.0).
+
+augmentation:
+  photometric:
+    enabled: true
+    brightness: 0.3
+    contrast: 0.3
+    saturation: 0.2
+    hue: 0.05
+    gaussian_noise_std: 0.01
+    grayscale_prob: 0.1
+
+sampling:
+  mode: weighted
+  alpha: 0.5
+  num_bins: 5
+  bin_edges_m: [0.0, 0.02, 0.04, 0.06, 0.10, 0.50]
+
+eval:
+  segment_seconds: 2.0
+  evo_bin: evo_ape
+
+paths:
+  outputs_dir:       outputs/step_i
+  checkpoints_dir:   outputs/step_i
+  trajectories_dir:  outputs/step_i/eval/trajectories
+  plots_dir:         outputs/step_i/eval/plots
+  studies_dir:       outputs/step_i/studies
+  sanity_dir:        outputs/step_i/sanity

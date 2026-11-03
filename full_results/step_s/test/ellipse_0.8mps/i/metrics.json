@@ -1,0 +1,18 @@
+{
+  "step": "s",
+  "split": "test",
+  "label": "ellipse_0.8mps",
+  "modality": "i",
+  "traj_id": 412,
+  "speed_mps": 0.8,
+  "ate_aligned": 0.4315944086060856,
+  "ate_endpoint": 0.5174036956200453,
+  "rpe_trans_1s_median": 0.007772124296287198,
+  "rpe_trans_1s_p95": 0.011104813061998235,
+  "rpe_rot_1s_median_deg": 0.07025526168464764,
+  "rpe_rot_1s_p95_deg": 0.08079749249437165,
+  "seg2s_median": 0.08118195308519473,
+  "seg2s_p95": 0.11396314942931518,
+  "n_frames": 3001,
+  "duration_s": 30.0
+}

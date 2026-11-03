@@ -1,0 +1,104 @@
+# Phase 2 Step H configuration. t-direct V hypothesis test.
+# Same data as Step G (data/raw_g, all trajs rendered with tex_03), same
+# train/eval split [0,1,2] -> 3, but V predicts (R, t) DIRECTLY rather than
+# (R, t/d, n) and reconstructing t = (t/d) * altitude.
+#
+# Question: was the (t/d) decomposition the bug behind V_traj_3 = 5.29 m
+# in Step G? If V_traj_3 < 3 m here, yes; >= 5 m, no.
+#
+# I is reused from Step G via symlink (outputs/step_h/i -> ../step_g/i),
+# so I_traj_3 should match Step G exactly (1.78 m). If it doesn't, the
+# symlink broke.
+#
+# Best.pt selection: same Approach-3 trick as Step G — minitest_traj_id
+# points at traj 3 in data/raw_g, so the train_*_tdirect.py scripts pick
+# the checkpoint that minimizes ATE on the held-out sinusoid.
+
+seed: 42
+
+texture:
+  raw_dir: Data/textures_raw
+  processed_dir: Data/textures_processed
+  train_dir: Data/textures_train
+  test_dir: Data/textures_test
+  plane_longer_m: 28.0
+  density_target_px_per_m: 100.0
+
+camera:
+  fx: 640.0
+  fy: 640.0
+  cx: 320.0
+  cy: 240.0
+
+image:
+  width: 640
+  height: 480
+
+data:
+  raw_dir: data/raw_g                   # REUSE Step G data — no re-render
+  train_ids: [0, 1, 2]
+  test_ids:  [3]
+  val_traj_id: 3
+  minitest_traj_id: 3                   # drives best.pt selector to traj 3
+  img_size: [480, 640]
+  imu_window: 10
+  num_workers: 4
+
+model:
+  cnn_feat_dim: 512
+  lstm_hidden: 128
+  variant: tdirect                      # NEW: train_v_tdirect/train_vi_tdirect
+                                         # assert this; ignored by default code.
+
+train:
+  batch_size: 8
+  lr: 1.0e-4
+  weight_decay: 1.0e-4
+  epochs_v: 30
+  epochs_i: 20                          # unused (I is reused via symlink)
+  epochs_vi_stage1: 10
+  epochs_vi_stage2: 20
+  stage2_lr_mult: 0.25
+  grad_clip: 1.0
+  warmup_epochs: 2
+  log_every: 50
+
+loss:
+  w_rot: 10.0
+  w_t: 5.0                              # NEW: replaces w_td=20.0; t in metres
+  w_trans: 5.0                          # fused-pose translation loss (VI)
+  w_imu_trans: 2.0                      # IMU branch translation loss (VI)
+  w_rot_imu: 5.0                        # IMU branch rotation loss (VI)
+  hover_mask_center: 0.01
+  hover_mask_width: 0.005
+  # REMOVED: w_td, w_n, w_warp, w_d (no decomposition, no scale head)
+
+augmentation:
+  photometric:
+    enabled: true
+    brightness: 0.3
+    contrast: 0.3
+    saturation: 0.2
+    hue: 0.05
+    gaussian_noise_std: 0.01
+    grayscale_prob: 0.1
+
+sampling:
+  mode: weighted
+  alpha: 0.5
+  num_bins: 5
+  bin_edges_m: [0.0, 0.02, 0.04, 0.06, 0.10, 0.50]
+
+eval:
+  segment_seconds: 2.0
+  evo_bin: evo_ape
+  # No fallback_threshold — NetworkVI_tdirect has no ||td_v|| fallback path
+  # (vision branch is metric, no near-zero direction-collapse failure mode).
+
+paths:
+  outputs_dir:       outputs/step_h
+  checkpoints_dir:   outputs/step_h
+  trajectories_dir:  outputs/step_h/eval/trajectories
+  plots_dir:         outputs/step_h/eval/plots
+  studies_dir:       outputs/step_h/studies
+  sanity_dir:        outputs/step_h/sanity

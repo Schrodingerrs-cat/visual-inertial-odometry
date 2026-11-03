@@ -1,0 +1,14 @@
+traj_id,split,family,shape,target_speed_mps,label
+312,train,simple_circle,circle,0.1,circle_0.1mps
+314,train,simple_figure8,figure8,0.15,figure8_0.1mps
+316,train,simple_diamond,diamond,0.2,diamond_0.2mps
+318,train,simple_zigzag,zigzag,0.2,zigzag_0.2mps
+313,train,simple_circle,circle,0.4,circle_0.4mps
+317,train,simple_diamond,diamond,0.4,diamond_0.4mps
+315,train,simple_figure8,figure8,0.5,figure8_0.5mps
+319,train,simple_zigzag,zigzag,0.5,zigzag_0.5mps
+320,test,simple_ellipse,ellipse,0.3,ellipse_0.3mps
+322,test,simple_triangle,triangle,0.3,triangle_0.3mps
+321,test,simple_ellipse,ellipse,0.5,ellipse_0.5mps
+323,test,simple_triangle,triangle,0.5,triangle_0.5mps
+324,test,simple_sinusoid_30s,sinusoid30s,0.5,sinusoid30s_0.5mps

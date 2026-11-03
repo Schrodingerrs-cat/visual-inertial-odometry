@@ -1,0 +1,210 @@
+# Phase 2 Step S — RETRY on a corrected pipeline (2026-05-03).
+#
+# The previous Step S underperformed for two reasons: (a) the synthetic
+# IMU data was generated with a buggy pipeline (triple-stacked finite-
+# difference cascade + constant-yaw attitude), producing boundary
+# spikes and stripping the gyro of orbital-rotation signal; (b) the
+# NetworkI architecture (unidirectional 1-layer LSTM, single MLP head,
+# axis-angle rotation) was too weak to fit the IMU window. This rerun
+# bundles THREE simultaneous changes vs Step K — speed retune + IMU
+# pipeline correction + NetworkI upgrade. It is therefore NOT a clean
+# A/B against Step K; the controlled-variable framing in the prior
+# Step S design is no longer accurate. The headline question is
+# simpler: "does V/I/VI work on drone-magnitude motion through the
+# corrected pipeline?"
+#
+# Change 1 — Speed retune (TRAJ_ID_MAP[400..413]):
+#   Train (8): 400-407 — 4 shapes × 2 speeds each, per-family ceilings:
+#                          circle  @ 0.5 / 1.2
+#                          fig8    @ 0.5 / 1.0
+#                          diamond @ 0.8 / 1.05  (1.05 = plane-fit
+#                                                  ceiling on seed 7006;
+#                                                  larger speeds shrink
+#                                                  the trajectory > 1%)
+#                          zigzag  @ 0.8 / 1.0
+#   Val (1):   408 — simple_ellipse @ 1.0 m/s (drives best.pt;
+#                    held-out shape, mid-range speed).
+#   Stage 1 test (4): 410, 411, 412, 413 — speed sweep on held-out
+#                     simple_ellipse:
+#                          410 @ 0.3 m/s (OOD slow — slower than every
+#                                          trained instance)
+#                          411 @ 0.5 m/s (in-range)
+#                          412 @ 0.8 m/s (in-range)
+#                          413 @ 1.2 m/s (= circle's trained ceiling)
+#
+# Change 2 — IMU pipeline correction (Option B, coordinated turn,
+#   R-chain ω). See blender/imu_simulation.py and the simple_*
+#   samplers in blender/trajectory_library.py:
+#     - figure8 / circle / ellipse samplers return analytic vel and
+#       acc alongside pos; the attitude / IMU pipeline never finite-
+#       differences position for these families.
+#     - Body-x along velocity, body-z along thrust direction
+#       (acc_world - g_world); yaw tracks orbital motion automatically
+#       so the gyro carries real signal instead of nothing.
+#     - ω is computed by a single finite-difference stage on R_wb
+#       (R^T · Ṙ → vee), with 2nd-order one-sided endpoints; eliminates
+#       the boundary spikes the previous pipeline produced.
+#     - For the smoothed-piecewise families (diamond / zigzag /
+#       triangle) the smoother + reflect padding zeroes the velocity
+#       at sample 0 and T-1; eps = 1e-3 m/s with carry-forward of the
+#       previous valid body-x keeps R_wb continuous across the
+#       degenerate samples.
+#
+# Change 3 — NetworkI architecture upgrade (models/network_i.py +
+#   models/backbones.py:IMUEncoder):
+#     - Bidirectional 2-layer LSTM, hidden=128 per direction.
+#     - All layers from both directions concatenated (512-d) and
+#       projected to feat_dim=256 with ReLU + dropout 0.1.
+#     - Two separate heads — rotation (6-D continuous, Zhou et al.
+#       2019) and translation (3-D).
+#   Public API unchanged: NetworkI(hidden_dim=128) still accepted;
+#   forward(...) still returns (R_3x3, t_3, feat). `feat` width is now
+#   256 (was 128); NetworkVI_tdirect's refiner consumes `self.imu.out_dim`
+#   so it propagates correctly. Train and eval scripts required no
+#   changes.
+#
+# Step S architecture (unchanged from prior Step S design except the
+# above):
+#   * V architecture: NetworkV_tdirect (same as Steps J/K — predicts
+#     translation directly, no td·depth ambiguity). Trained via
+#     scripts/train_v_tdirect.py with TDirectPoseLoss. RAFT distillation
+#     dropped (RAFT confirmed not engaging on this scene at Step K,
+#     >99.6% FB rejection) — Step S uses the no-distill tdirect path.
+#   * I architecture: NetworkI as upgraded above. Loss = IMUPoseLoss
+#     (NOT IMUPoseLoss_hover; Phase 1 hover loss did not help on the
+#     within-family Step K test set, so we keep the original loss).
+#   * VI architecture: NetworkVI_tdirect. Trained via
+#     scripts/train_vi_tdirect.py with VILoss_tdirect, two-stage,
+#     stage2_lr_mult=0.0 (lesson L1).
+#   * Fresh init for V, I, VI — no warm-start from any prior checkpoint.
+#     (Old checkpoints invalidated by the NetworkI architecture change.)
+#
+# Stage 2 / Step K cross-check (configs/step_s_kxtest.yaml):
+#   Reuses Step S checkpoints to evaluate on Step K's existing test
+#   trajectories (320-324). With three changes coincident this is no
+#   longer a controlled experiment — it is a regression check ("does
+#   the corrected/upgraded pipeline retain Step K test performance?").
+#   KNOWN CONFOUND: Step K trajs 320-324 were rendered under the OLD
+#   broken IMU pipeline, so Stage 2 evaluates corrected-pipeline
+#   checkpoints against broken-pipeline IMU input. Stage 2 numbers
+#   must be interpreted with that distribution shift in mind — a
+#   degraded Stage 2 result does not necessarily mean the upgraded
+#   pipeline lost slow-speed capability; it may simply mean the IMU
+#   distribution at evaluation time differs from training time.
+#
+# Stage 1 results land in outputs/step_s/results.csv.
+# Stage 2 results land in outputs/step_s_kxtest/results.csv (see
+# configs/step_s_kxtest.yaml).
+
+seed: 42
+
+texture:
+  raw_dir: Data/textures_raw
+  processed_dir: Data/textures_processed
+  train_dir: Data/textures_train
+  test_dir: Data/textures_test
+  plane_longer_m: 28.0
+  density_target_px_per_m: 100.0
+
+camera:
+  fx: 640.0
+  fy: 640.0
+  cx: 320.0
+  cy: 240.0
+
+image:
+  width: 640
+  height: 480
+
+data:
+  raw_dir:
+    data/raw_g # SHARED with Step J/K; new trajs
+    # 400-413 rendered into the same
+    # dir by step_s_render.sh.
+  train_ids:
+    [400, 401, 402, 403, 404, 405, 406, 407] # 4 shapes × 2 speeds, per-family
+    # ceilings (see TRAJ_ID_MAP).
+  val_traj_id:
+    408 # simple_ellipse @ 0.4 m/s
+    # → drives best.pt selector.
+  minitest_traj_id:
+    408 # same traj used as minitest;
+    # Step S has a single held-out
+    # mid-speed instance.
+  test_ids:
+    [410, 411, 412, 413] # Stage 1 (the headline) — pure
+    # speed sweep on simple_ellipse
+    # at 0.5 / 0.8 / 1.0 / 1.2 m/s.
+    # Stage 2 (Step K trajs) uses
+    # configs/step_s_kxtest.yaml.
+  img_size: [480, 640]
+  imu_window:
+    10 # Phase 0 IMU window; NOT the
+    # Phase 2 100-sample context.
+  num_workers: 4
+
+model:
+  cnn_feat_dim: 512
+  lstm_hidden: 128
+  variant:
+    tdirect # asserted by train_v_tdirect /
+    # train_vi_tdirect / evaluate_tdirect.
+
+train:
+  batch_size: 8
+  lr: 1.0e-4
+  weight_decay: 1.0e-4
+  epochs_v: 30 # mirrors Step K
+  epochs_i: 20
+  epochs_vi_stage1: 10
+  epochs_vi_stage2: 20
+  stage2_lr_mult: 0.0 # L1: V/I FROZEN in Stage 2.
+  grad_clip: 1.0
+  warmup_epochs: 2
+  log_every: 50
+
+loss:
+  # tdirect loss block — TDirectPoseLoss (V) + VILoss_tdirect (VI) read
+  # exactly these keys. Matches Step K's loss block 1:1 so any V/VI
+  # difference vs Step K is purely from the speed-bucket change.
+  w_rot: 10.0
+  w_t: 5.0
+  w_trans: 5.0
+  w_imu_trans: 2.0
+  w_rot_imu: 5.0
+  hover_mask_center: 0.01
+  hover_mask_width: 0.005
+  imu_use_hover:
+    false # Step S: I uses original
+    # IMUPoseLoss (no hover masking).
+    # train_i.py reads this to
+    # select between IMUPoseLoss
+    # and IMUPoseLoss_hover.
+
+augmentation:
+  photometric:
+    enabled: true
+    brightness: 0.3
+    contrast: 0.3
+    saturation: 0.2
+    hue: 0.05
+    gaussian_noise_std: 0.01
+    grayscale_prob: 0.1
+
+sampling:
+  mode: weighted
+  alpha: 0.5
+  num_bins: 5
+  bin_edges_m: [0.0, 0.02, 0.04, 0.06, 0.10, 0.50]
+
+eval:
+  segment_seconds: 2.0
+  evo_bin: evo_ape
+
+paths:
+  outputs_dir: outputs/step_s
+  checkpoints_dir: outputs/step_s
+  trajectories_dir: outputs/step_s/eval/trajectories
+  plots_dir: outputs/step_s/eval/plots
+  studies_dir: outputs/step_s/studies
+  sanity_dir: outputs/step_s/sanity

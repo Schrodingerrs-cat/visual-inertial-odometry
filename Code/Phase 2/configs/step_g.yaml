@@ -1,0 +1,116 @@
+# Phase 2 Step G configuration. Disentangled within-family generalization test.
+# Re-renders trajs 0, 1, 2, 3 all with tex_03 (forced via --force_texture) so
+# that V trains on [0, 1, 2] and is evaluated on traj 3 with the SAME texture
+# as training — isolating trajectory-shape generalization from texture
+# generalization. Step F's traj-3 eval was contaminated because trajs 0..2
+# used tex_00..02 while traj 3 used tex_03 (held-out texture).
+#
+# tex_03 (not tex_00) is used to preserve traj 3's plane geometry exactly as
+# in Step F (28×18.69 m). Cross-check: I_traj_3 should still be ≈3.41 m on
+# data/raw_g — same IMU, same poses, only the rendered RGB differs.
+#
+# Best.pt selection (Approach 3, achieved via config alone): minitest_traj_id
+# is repurposed to point at traj 3 in data/raw_g, so train_v.py's hard-coded
+# `val_ATE_on_minitest` selector picks the checkpoint that minimizes ATE on
+# the held-out sinusoid. No code changes to train_v.py / train_i.py /
+# train_vi.py required.
+
+seed: 42
+
+texture:
+  raw_dir: Data/textures_raw
+  processed_dir: Data/textures_processed
+  train_dir: Data/textures_train
+  test_dir: Data/textures_test
+  plane_longer_m: 28.0
+  density_target_px_per_m: 100.0
+
+camera:
+  fx: 640.0
+  fy: 640.0
+  cx: 320.0
+  cy: 240.0
+
+image:
+  width: 640
+  height: 480
+
+data:
+  raw_dir: data/raw_g                   # CHANGED: parallel data dir for Step G
+  train_ids: [0, 1, 2]                  # same as step_f (traj 3 held out)
+  test_ids:  [3]                         # CHANGED: only traj 3 matters for the
+                                         # within-family question. test trajs
+                                         # 100/101/102 are not re-rendered, so
+                                         # they're not addressable from raw_g.
+  val_traj_id: 3                         # in-training val on the held-out
+                                         # sinusoid (logged as val_ATE_on_traj_0
+                                         # column — name is just a label).
+  minitest_traj_id: 3                   # CHANGED from 200: drives best.pt
+                                         # selector to pick by ATE on traj 3.
+                                         # Approach 3 done via config; no code
+                                         # changes to train_v.py needed. The
+                                         # val_ATE_on_minitest column will
+                                         # equal val_ATE_on_traj_0 — redundant
+                                         # but harmless.
+  img_size: [480, 640]
+  imu_window: 10
+  num_workers: 4
+
+model:
+  cnn_feat_dim: 512
+  lstm_hidden: 128
+  normal_init_bias: [0.0, 0.0, 1.0]
+
+train:
+  batch_size: 8
+  lr: 1.0e-4
+  weight_decay: 1.0e-4
+  epochs_v: 30
+  epochs_i: 20
+  epochs_vi_stage1: 10
+  epochs_vi_stage2: 20
+  stage2_lr_mult: 0.25
+  grad_clip: 1.0
+  warmup_epochs: 2
+  log_every: 50
+
+loss:
+  w_rot: 10.0
+  w_td: 20.0
+  w_n: 0.1
+  w_warp: 0.1
+  w_trans: 5.0
+  w_imu_trans: 2.0
+  w_rot_imu: 5.0
+  w_d: 0.5
+  hover_mask_center: 0.01
+  hover_mask_width: 0.005
+
+augmentation:
+  photometric:
+    enabled: true
+    brightness: 0.3
+    contrast: 0.3
+    saturation: 0.2
+    hue: 0.05
+    gaussian_noise_std: 0.01
+    grayscale_prob: 0.1
+
+sampling:
+  mode: weighted
+  alpha: 0.5
+  num_bins: 5
+  bin_edges_m: [0.0, 0.02, 0.04, 0.06, 0.10, 0.50]
+
+eval:
+  segment_seconds: 2.0
+  evo_bin: evo_ape
+  fallback_threshold: 0.005
+
+paths:
+  outputs_dir:       outputs/step_g
+  checkpoints_dir:   outputs/step_g
+  trajectories_dir:  outputs/step_g/eval/trajectories
+  plots_dir:         outputs/step_g/eval/plots
+  studies_dir:       outputs/step_g/studies
+  sanity_dir:        outputs/step_g/sanity

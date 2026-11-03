@@ -1,0 +1,18 @@
+{
+  "step": "k",
+  "split": "train",
+  "label": "diamond_0.2mps",
+  "modality": "v",
+  "traj_id": 316,
+  "speed_mps": 0.2,
+  "ate_aligned": 0.047298278072348834,
+  "ate_endpoint": 0.09537309301937068,
+  "rpe_trans_1s_median": 0.0012120014178721768,
+  "rpe_trans_1s_p95": 0.004748122649448657,
+  "rpe_rot_1s_median_deg": 0.0455456659306012,
+  "rpe_rot_1s_p95_deg": 0.12365018715121387,
+  "seg2s_median": 0.013088610917045322,
+  "seg2s_p95": 0.03391786728635812,
+  "n_frames": 3001,
+  "duration_s": 30.0
+}

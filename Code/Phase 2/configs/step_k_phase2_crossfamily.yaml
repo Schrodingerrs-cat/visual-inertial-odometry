@@ -1,0 +1,107 @@
+# Phase 2 Step K — cross-family eval config.
+#
+# Mirrors configs/step_k_crossfamily.yaml but writes to a separate output
+# directory (outputs/step_k_phase2_crossfamily) and forwards the Phase 2
+# imu_context_length so the I branch reads its length-100 window.
+#
+# V and VI checkpoints are unchanged (loaded from outputs/step_k/{v,vi}).
+
+seed: 42
+
+texture:
+  raw_dir: Data/textures_raw
+  processed_dir: Data/textures_processed
+  train_dir: Data/textures_train
+  test_dir: Data/textures_test
+  plane_longer_m: 28.0
+  density_target_px_per_m: 100.0
+
+camera:
+  fx: 640.0
+  fy: 640.0
+  cx: 320.0
+  cy: 240.0
+
+image:
+  width: 640
+  height: 480
+
+data:
+  raw_dir: data/raw                      # original Step F/G renders
+  train_ids: [312, 313, 314, 315, 316, 317, 318, 319]
+  val_traj_id: 320
+  minitest_traj_id: 322
+  test_ids: [3, 100, 101, 102]           # cross-family test set
+  img_size: [480, 640]
+  imu_window: 10
+  imu_context_length: 100                # Phase 2 I-branch window
+  num_workers: 4
+
+model:
+  cnn_feat_dim: 512
+  lstm_hidden: 128
+  variant: tdirect
+
+train:
+  batch_size: 8
+  lr: 1.0e-4
+  weight_decay: 1.0e-4
+  epochs_v: 30
+  epochs_i: 20
+  epochs_vi_stage1: 10
+  epochs_vi_stage2: 20
+  stage2_lr_mult: 0.0
+  grad_clip: 1.0
+  warmup_epochs: 2
+  log_every: 50
+
+loss:
+  w_rot: 10.0
+  w_t: 5.0
+  w_trans: 5.0
+  w_imu_trans: 2.0
+  w_rot_imu: 5.0
+  hover_mask_center: 0.01
+  hover_mask_width: 0.005
+
+distill:
+  lambda: 1.0
+  sigma_eps_t: 0.001
+  sigma_eps_R: 0.005
+  sigma_px_floor: 0.5
+  raft_weights: "Raft_Large_Weights.C_T_SKHT_V2"
+  raft_weights_fallback: "Raft_Large_Weights.C_T_V2"
+
+raft:
+  num_flow_updates: 12
+  correspondence_stride: 16
+  ransac_threshold_px: 2.0
+  fb_valid_threshold_px: 5.0
+
+augmentation:
+  photometric:
+    enabled: true
+    brightness: 0.3
+    contrast: 0.3
+    saturation: 0.2
+    hue: 0.05
+    gaussian_noise_std: 0.01
+    grayscale_prob: 0.1
+
+sampling:
+  mode: weighted
+  alpha: 0.5
+  num_bins: 5
+  bin_edges_m: [0.0, 0.02, 0.04, 0.06, 0.10, 0.50]
+
+eval:
+  segment_seconds: 2.0
+  evo_bin: evo_ape
+
+paths:
+  outputs_dir:       outputs/step_k_phase2_crossfamily
+  checkpoints_dir:   outputs/step_k_phase2_crossfamily
+  trajectories_dir:  outputs/step_k_phase2_crossfamily/eval/trajectories
+  plots_dir:         outputs/step_k_phase2_crossfamily/eval/plots
+  studies_dir:       outputs/step_k_phase2_crossfamily/studies
+  sanity_dir:        outputs/step_k_phase2_crossfamily/sanity

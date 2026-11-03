@@ -1,0 +1,18 @@
+{
+  "step": "k",
+  "split": "test",
+  "label": "sinusoid30s_0.5mps",
+  "modality": "v",
+  "traj_id": 324,
+  "speed_mps": 0.5,
+  "ate_aligned": 0.1440579671068052,
+  "ate_endpoint": 0.2285113162734258,
+  "rpe_trans_1s_median": 0.0036150089555545464,
+  "rpe_trans_1s_p95": 0.01083222249802112,
+  "rpe_rot_1s_median_deg": 0.06042222211351965,
+  "rpe_rot_1s_p95_deg": 0.26783884711603334,
+  "seg2s_median": 0.046352851733657434,
+  "seg2s_p95": 0.0989292318361693,
+  "n_frames": 3001,
+  "duration_s": 30.0
+}

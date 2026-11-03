@@ -1,0 +1,135 @@
+# Phase 2 Step S Stage 2 — Step K regression check on the corrected
+# Step S pipeline (2026-05-03).
+#
+# Re-uses Step S's trained V/I/VI checkpoints (outputs/step_s/{v,i,vi}/
+# best.pt) and evaluates them on Step K's existing test trajectories
+# (320-324, all in the 0.3-0.5 m/s range). Stage 1 (configs/step_s.yaml)
+# trains on speeds spanning 0.5-1.2 m/s through the corrected pipeline;
+# Stage 2 asks "did the corrected/upgraded Step S retain Step K's test-
+# set performance?"
+#
+# This is a REGRESSION CHECK, not a controlled experiment. Step S
+# bundles three changes vs Step K (speed retune + IMU pipeline
+# correction + bidirectional-NetworkI architecture) so a single
+# Stage 2 number cannot attribute any drift to a specific cause.
+#
+# Decision matrix (read jointly with Stage 1 = configs/step_s.yaml):
+#   Stage 1 OK + Stage 2 OK   → corrected pipeline + broader training
+#                                works at both ends of the speed
+#                                envelope. Strong overall result.
+#   Stage 1 OK + Stage 2 FAIL → may indicate the broader training
+#                                tradeoff or the IMU distribution
+#                                shift below — see CONFOUND.
+#   Stage 1 FAIL + Stage 2 OK → upgraded I/VI works at slow speed but
+#                                not at the new fast end; flag and
+#                                investigate.
+#   Stage 1 FAIL + Stage 2 FAIL → training failure; debug.
+#
+# CONFOUND — IMU distribution shift between train and Stage 2 eval:
+#   Step K test trajs 320-324 were rendered under the OLD broken IMU
+#   pipeline (constant-yaw attitude, triple-stacked finite-diff gyro,
+#   boundary spikes on circle/ellipse). Step S checkpoints were
+#   trained on the CORRECTED pipeline (coordinated-turn yaw,
+#   single-stage R-chain ω, no boundary spikes, eps=1e-3 carry-
+#   forward). Stage 2 therefore feeds an out-of-distribution IMU
+#   signal to the I/VI branches at evaluation time. A degraded
+#   Stage 2 result is not necessarily a slow-speed capability loss;
+#   it may simply be the train/eval IMU distribution mismatch. To
+#   isolate, you'd need to re-render 320-324 through the corrected
+#   pipeline — out of scope for this regression check.
+#
+# What changes vs configs/step_s.yaml:
+#   * data.test_ids = [320, 321, 322, 323, 324]
+#   * paths.outputs_dir = outputs/step_s_kxtest (separate results.csv)
+#   * paths.trajectories_dir / plots_dir under the same root
+#   * paths.checkpoints_dir = outputs/step_s (Step S checkpoints; eval
+#     also accepts the --checkpoints_dir flag explicitly).
+# All other keys identical to configs/step_s.yaml — kept verbatim so
+# load_config() symmetry holds.
+
+seed: 42
+
+texture:
+  raw_dir: Data/textures_raw
+  processed_dir: Data/textures_processed
+  train_dir: Data/textures_train
+  test_dir: Data/textures_test
+  plane_longer_m: 28.0
+  density_target_px_per_m: 100.0
+
+camera:
+  fx: 640.0
+  fy: 640.0
+  cx: 320.0
+  cy: 240.0
+
+image:
+  width: 640
+  height: 480
+
+data:
+  raw_dir: data/raw_g                    # Step K trajs 320-324 also live here.
+  train_ids: [400, 401, 402, 403,
+              404, 405, 406, 407]        # unused by eval; matches step_s.yaml.
+  val_traj_id: 408                       # unused by eval.
+  minitest_traj_id: 408                  # unused by eval.
+  test_ids: [320, 321, 322, 323, 324]    # Step K's existing test set.
+  img_size: [480, 640]
+  imu_window: 10
+  num_workers: 4
+
+model:
+  cnn_feat_dim: 512
+  lstm_hidden: 128
+  variant: tdirect
+
+train:
+  batch_size: 8
+  lr: 1.0e-4
+  weight_decay: 1.0e-4
+  epochs_v: 30
+  epochs_i: 20
+  epochs_vi_stage1: 10
+  epochs_vi_stage2: 20
+  stage2_lr_mult: 0.0
+  grad_clip: 1.0
+  warmup_epochs: 2
+  log_every: 50
+
+loss:
+  w_rot: 10.0
+  w_t: 5.0
+  w_trans: 5.0
+  w_imu_trans: 2.0
+  w_rot_imu: 5.0
+  hover_mask_center: 0.01
+  hover_mask_width: 0.005
+  imu_use_hover: false
+
+augmentation:
+  photometric:
+    enabled: true
+    brightness: 0.3
+    contrast: 0.3
+    saturation: 0.2
+    hue: 0.05
+    gaussian_noise_std: 0.01
+    grayscale_prob: 0.1
+
+sampling:
+  mode: weighted
+  alpha: 0.5
+  num_bins: 5
+  bin_edges_m: [0.0, 0.02, 0.04, 0.06, 0.10, 0.50]
+
+eval:
+  segment_seconds: 2.0
+  evo_bin: evo_ape
+
+paths:
+  outputs_dir:       outputs/step_s_kxtest
+  checkpoints_dir:   outputs/step_s        # eval reads V/I/VI from Step S.
+  trajectories_dir:  outputs/step_s_kxtest/eval/trajectories
+  plots_dir:         outputs/step_s_kxtest/eval/plots
+  studies_dir:       outputs/step_s_kxtest/studies
+  sanity_dir:        outputs/step_s_kxtest/sanity

@@ -1,0 +1,123 @@
+# Phase 2 Step K — eval Step K's trained V/I/VI on the *training* set
+# itself (trajs 312-319) to produce per-traj pred-vs-GT comparison plots.
+#
+# Use case: visual sanity check of how well each method fits the data it
+# was trained on. NOT held-out generalisation (use configs/step_k.yaml or
+# configs/step_k_extended.yaml for that).
+#
+# Two ways to invoke evaluate_tdirect.py with this config:
+#   (a) python scripts/evaluate_tdirect.py \
+#         --config configs/step_k_traineval.yaml \
+#         --checkpoints_dir outputs/step_k \
+#         --split test \                              # ← reads test_ids
+#         --methods v i vi --skip_missing
+#   (b) python scripts/evaluate_tdirect.py \
+#         --config configs/step_k_traineval.yaml \
+#         --checkpoints_dir outputs/step_k \
+#         --split train \                             # ← reads train_ids
+#         --methods v i vi --skip_missing
+# Both are equivalent here because train_ids == test_ids == [312..319].
+#
+# Output:
+#   outputs/step_k_traineval/results.csv
+#   outputs/step_k_traineval/eval/trajectories/{gt,v,i,vi}_{312..319}.tum
+#   outputs/step_k_traineval/eval/plots/comparison_{312..319}_xy.png    ← KEY
+#   outputs/step_k_traineval/eval/plots/comparison_{312..319}_3d.png
+#   outputs/step_k_traineval/eval/plots/comparison_{312..319}_xyz_error.png
+#   outputs/step_k_traineval/eval/plots/{v,i,vi}_{312..319}_*.png       per-method
+#
+# Pre-req: data/raw_g/traj_0312 .. traj_0319 must already be rendered
+# (they were created by slurm/step_k_render.sh during the original run).
+
+seed: 42
+
+texture:
+  raw_dir: Data/textures_raw
+  processed_dir: Data/textures_processed
+  train_dir: Data/textures_train
+  test_dir: Data/textures_test
+  plane_longer_m: 28.0
+  density_target_px_per_m: 100.0
+
+camera:
+  fx: 640.0
+  fy: 640.0
+  cx: 320.0
+  cy: 240.0
+
+image:
+  width: 640
+  height: 480
+
+data:
+  raw_dir: data/raw_g
+  train_ids: [312, 313, 314, 315, 316, 317, 318, 319]
+  val_traj_id: 320
+  minitest_traj_id: 322
+  test_ids:  [312, 313, 314, 315, 316, 317, 318, 319]
+  img_size: [480, 640]
+  imu_window: 10
+  num_workers: 4
+
+model:
+  cnn_feat_dim: 512
+  lstm_hidden: 128
+  variant: tdirect
+
+train:
+  batch_size: 8
+  lr: 1.0e-4
+  weight_decay: 1.0e-4
+  epochs_v: 30
+  epochs_i: 20
+  epochs_vi_stage1: 10
+  epochs_vi_stage2: 20
+  stage2_lr_mult: 0.0
+  grad_clip: 1.0
+  warmup_epochs: 2
+  log_every: 50
+
+loss:
+  w_rot: 10.0
+  w_t: 5.0
+  w_trans: 5.0
+  w_imu_trans: 2.0
+  w_rot_imu: 5.0
+  hover_mask_center: 0.01
+  hover_mask_width: 0.005
+
+distill:
+  lambda: 1.0
+  sigma_eps_t: 0.001
+  sigma_eps_R: 0.005
+  sigma_px_floor: 0.5
+  raft_weights: "Raft_Large_Weights.C_T_SKHT_V2"
+  raft_weights_fallback: "Raft_Large_Weights.C_T_V2"
+
+raft:
+  num_flow_updates: 12
+  correspondence_stride: 16
+  ransac_threshold_px: 2.0
+  fb_valid_threshold_px: 5.0
+
+augmentation:
+  photometric:
+    enabled: false   # eval — no need for augmentation
+
+sampling:
+  mode: weighted
+  alpha: 0.5
+  num_bins: 5
+  bin_edges_m: [0.0, 0.02, 0.04, 0.06, 0.10, 0.50]
+
+eval:
+  segment_seconds: 2.0
+  evo_bin: evo_ape
+
+paths:
+  outputs_dir:       outputs/step_k_traineval
+  checkpoints_dir:   outputs/step_k_traineval
+  trajectories_dir:  outputs/step_k_traineval/eval/trajectories
+  plots_dir:         outputs/step_k_traineval/eval/plots
+  studies_dir:       outputs/step_k_traineval/studies
+  sanity_dir:        outputs/step_k_traineval/sanity
