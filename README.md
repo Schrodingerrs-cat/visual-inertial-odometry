@@ -329,6 +329,28 @@ drifting badly on a 100s sinusoid:
 
 ![Early Step-H drift](Results/Phase2/portfolio/09_early_step_h_drift.png)
 
+### Drone flight videos (Blender)
+
+Blender (Cycles, GPU) renders of a quadrotor flying the trajectories from the
+two best Phase 2 steps, over one of the carpet textures used for training data.
+The drone follows the **ground truth** (pink trail); the **network prediction**
+is the blue trail with a blue ghost drone. Each video cuts between a wide shot,
+a chase camera and a top-down view (30 s of flight at 2x speed).
+
+| Step | Trajectory | Network | ATE (SE(3)-aligned) | Video |
+|---|---|---|---:|---|
+| **K** | ellipse, 0.3 m/s (test) | V | 0.082 m | [`drone_step_k.mp4`](Results/Phase2/videos/drone_step_k.mp4) |
+| **S** | ellipse, 0.8 m/s (test) | VI | 0.161 m | [`drone_step_s.mp4`](Results/Phase2/videos/drone_step_s.mp4) |
+
+[![Step K drone flight](Results/Phase2/videos/drone_step_k_thumb.png)](Results/Phase2/videos/drone_step_k.mp4)
+[![Step S drone flight](Results/Phase2/videos/drone_step_s_thumb.png)](Results/Phase2/videos/drone_step_s.mp4)
+
+Rendered from each run's `gt.tum` / `pred.tum` in
+`Code/Phase 2/full_results/step_{k,s}/` (script and Slurm job live in
+`~/vio/tools/blender_video/` on turing). Step K is a
+visual-only network on slow trajectories, so its absolute error is not directly
+comparable to Step S (faster trajectories, full V/I/VI comparison).
+
 ## Evaluation
 
 - **ATE under SE(3) alignment** (not Sim(3)), so scale-collapse failures
