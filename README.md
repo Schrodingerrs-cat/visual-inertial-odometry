@@ -333,9 +333,24 @@ drifting badly on a 100s sinusoid:
 
 Blender (Cycles, GPU) renders of a quadrotor flying the trajectories from the
 two best Phase 2 steps, over one of the carpet textures used for training data.
-The drone follows the **ground truth** (pink trail); the **network prediction**
-is the blue trail with a blue ghost drone. Each video cuts between a wide shot,
-a chase camera and a top-down view (30 s of flight at 2x speed).
+
+**How to read the render:**
+
+- **Pink trail + white drone = ground truth.** The true 6-DoF path the drone
+  actually flew (the simulator's pose, `gt.tum`). The white drone is placed at
+  the true pose at each frame, and the pink ribbon is the path it has covered so far.
+- **Blue trail + blue ghost drone = network prediction.** The path the trained
+  network estimated from the rendered camera images (V) or from images + IMU (VI),
+  from `pred.tum`. The blue ghost drone is placed at the *predicted* pose at the
+  same timestamp.
+- **The gap between blue and pink is the error.** Where the two trails overlap,
+  the estimate is accurate; where they separate, the network has drifted. The
+  reported ATE is the RMS of that gap after SE(3) alignment. The renders show the
+  raw, unaligned prediction, so a constant offset between the trails is not
+  counted as error in the ATE number.
+- Each video cuts between a wide shot, a chase camera and a top-down view
+  (30 s of flight, shown at 2x speed). Floor = one of the carpet textures used
+  to generate the training data.
 
 | Step | Trajectory | Network | ATE (SE(3)-aligned) | Video |
 |---|---|---|---:|---|
@@ -347,7 +362,8 @@ a chase camera and a top-down view (30 s of flight at 2x speed).
 
 Rendered from each run's `gt.tum` / `pred.tum` in
 `Code/Phase 2/full_results/step_{k,s}/` (script and Slurm job live in
-`~/vio/tools/blender_video/` on turing). Step K is a
+`~/vio/tools/blender_video/` on turing; script copy at
+[`render_drone_video.py`](Results/Phase2/videos/render_drone_video.py)). Step K is a
 visual-only network on slow trajectories, so its absolute error is not directly
 comparable to Step S (faster trajectories, full V/I/VI comparison).
 
